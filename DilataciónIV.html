@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dilatación Temporal — Agujero Negro de Schwarzschild</title>
+    <style>
+        :root {
+            --bg: #0c0f12;
+            --text: #d1d5db;
+            --cyan: #38bdf8;
+            --cyan2: #0ea5e9;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --green: #22c55e;
+            --panel: rgba(13,20,30,0.88);
+            --border: rgba(56,189,248,0.28);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Consolas', 'Courier New', monospace;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        #simCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        /* ── HUD panels ── */
+        .hud-panel {
+            position: absolute;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 16px 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.65);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        #panelFisica {
+            top: 16px;
+            left: 16px;
+            width: 318px;
+        }
+
+        #panelNave {
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            min-width: 240px;
+            text-align: center;
+            border-top: 3px solid var(--amber);
+        }
+
+        #panelExt {
+            top: 16px;
+            right: 16px;
+            min-width: 240px;
+            text-align: right;
+            border-top: 3px solid var(--cyan2);
+        }
+
+        #panelTelemetria {
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            min-width: 560px;
+            text-align: center;
+        }
+
+        /* ── Typography ── */
+        h2, h3 {
+            font-size: 0.95em;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+        }
+
+        .digital-clock {
+            font-size: 1.75em;
+            color: #fff;
+            font-weight: bold;
+            margin: 6px 0;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px rgba(56,189,248,0.5);
+            transition: color 0.15s, text-shadow 0.15s;
+        }
+
+        .diff-counter {
+            font-size: 1.8em;
+            color: var(--red);
+            font-weight: bold;
+            margin: 10px 0 4px;
+            text-shadow: 0 0 10px rgba(239,68,68,0.5);
+        }
+
+        /* ── Controls ── */
+        .ctrl-group {
+            margin-bottom: 14px;
+        }
+
+        .ctrl-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            color: #9ca3af;
+            margin-bottom: 5px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: ew-resize;
+            accent-color: var(--cyan);
+            height: 4px;
+        }
+
+        input[type=number], input[type=text] {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(56,189,248,0.35);
+            color: #fff;
+            padding: 5px 9px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.88em;
+            margin-top: 6px;
+            outline: none;
+        }
+        input[type=number]:focus, input[type=text]:focus {
+            border-color: var(--cyan);
+        }
+
+        /* ── Buttons ── */
+        .cmd-btn {
+            background: transparent;
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-top: 7px;
+            width: 100%;
+            text-transform: uppercase;
+            font-size: 0.8em;
+            transition: all 0.18s;
+        }
+        .cmd-btn:hover {
+            background: var(--cyan);
+            color: var(--bg);
+            box-shadow: 0 0 10px var(--cyan);
+        }
+        .cmd-btn.danger { color: var(--red); border-color: var(--red); }
+        .cmd-btn.danger:hover { background: var(--red); color: #fff; box-shadow: 0 0 10px var(--red); }
+        .cmd-btn.amber { color: var(--amber); border-color: var(--amber); }
+        .cmd-btn.amber:hover { background: var(--amber); color: var(--bg); box-shadow: 0 0 10px var(--amber); }
+
+        /* ── Metric rows ── */
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.82em;
+            margin-bottom: 6px;
+            color: #9ca3af;
+            align-items: baseline;
+        }
+        .metric-val {
+            color: var(--cyan);
+            font-weight: bold;
+            font-size: 1.05em;
+            text-align: right;
+        }
+
+        /* ── Clock bars ── */
+        .clock-bar-bg {
+            width: 100%;
+            height: 5px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px;
+            margin: 5px 0 3px;
+            overflow: hidden;
+        }
+        .clock-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--cyan);
+            width: 100%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+        .clock-rate-label {
+            font-size: 0.78em;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+        .shift-label {
+            font-size: 0.82em;
+            font-weight: bold;
+            margin-top: 5px;
+            min-height: 1.2em;
+        }
+
+        /* ── Badges ── */
+        .status-badge {
+            display: inline-block;
+            background: var(--amber);
+            color: #000;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.82em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .extreme-badge {
+            display: none;
+            background: var(--red);
+            color: #fff;
+            padding: 2px 7px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 0.75em;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .hint {
+            font-size: 0.73em;
+            color: #6b7280;
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        select {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(56,189,248,0.35);
+            color: #fff;
+            padding: 5px 9px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.88em;
+            margin-top: 6px;
+            outline: none;
+            cursor: pointer;
+        }
+        select:focus { border-color: var(--cyan); }
+        select option { background: #0c0f12; }
+
+        .clock-unit-label {
+            font-size: 0.72em;
+            color: #6b7280;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+            min-height: 1.1em;
+        }
+
+        .two-btns {
+            display: flex;
+            gap: 8px;
+        }
+        .two-btns .cmd-btn { margin-top: 0; }
+
+        /* Separator inside panel */
+        .sep {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.07);
+            margin: 12px 0;
+        }
+
+        /* ── MOBILE MENU BUTTON ── */
+        #btnMenu {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 300;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            color: var(--cyan);
+            font-size: 1.4em;
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+
+        /* ── MOBILE DRAWER ── */
+        #mobileDrawer {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 200;
+        }
+        #drawerOverlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+        #drawerContent {
+            position: absolute;
+            top: 0; left: 0;
+            width: 220px;
+            height: 100%;
+            background: rgba(10,15,22,0.97);
+            border-right: 1px solid var(--border);
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+        #drawerContent h4 {
+            color: var(--cyan);
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 6px;
+        }
+        .drawer-btn {
+            background: rgba(56,189,248,0.08);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 12px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9em;
+            text-align: left;
+            transition: all 0.15s;
+        }
+        .drawer-btn:hover, .drawer-btn.active {
+            background: rgba(56,189,248,0.2);
+            border-color: var(--cyan);
+            color: #fff;
+        }
+
+        /* ── MOBILE PANEL CLOSE BUTTON ── */
+        .panel-close-btn {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            font-size: 1.2em;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            line-height: 32px;
+            text-align: center;
+            border-radius: 4px;
+        }
+        .panel-close-btn:hover { color: #fff; }
+
+        /* ── ZOOM BUTTONS (mobile canvas) ── */
+        #zoomBtns {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            right: 16px;
+            z-index: 150;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #zoomBtns button {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            color: var(--cyan);
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            font-size: 1.5em;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* ══════════════════════════════════════════
+           MOBILE RESPONSIVE (≤ 768px)
+        ══════════════════════════════════════════ */
+        @media (max-width: 768px) {
+
+            #btnMenu {
+                display: flex;
+            }
+
+            #zoomBtns {
+                display: flex;
+            }
+
+            /* All panels hidden by default on mobile */
+            .hud-panel {
+                display: none;
+                top: 70px !important;
+                left: 50% !important;
+                right: auto !important;
+                bottom: auto !important;
+                transform: translateX(-50%) !important;
+                width: calc(100vw - 32px) !important;
+                max-width: 400px !important;
+                min-width: 0 !important;
+                text-align: left !important;
+                border-top-width: 1px !important;
+                overflow-y: auto;
+                max-height: calc(100vh - 90px);
+                padding-right: 36px; /* space for close btn */
+            }
+
+            .hud-panel.mobile-visible {
+                display: block;
+            }
+
+            /* Close button visible on mobile */
+            .panel-close-btn {
+                display: block;
+            }
+
+            /* Sliders: larger touch targets */
+            input[type=range] {
+                height: 28px;
+                touch-action: none;
+                cursor: pointer;
+            }
+
+            /* Inputs: min 16px to prevent Safari auto-zoom */
+            input[type=number],
+            input[type=text],
+            select {
+                font-size: 16px !important;
+            }
+
+            /* Buttons: min 44px tall */
+            .cmd-btn {
+                min-height: 44px;
+                font-size: 0.85em;
+            }
+
+            /* Telemetry: no min-width, full available width */
+            #panelTelemetria {
+                min-width: 0 !important;
+            }
+
+            /* Clock numbers slightly smaller on small screens */
+            .digital-clock {
+                font-size: 1.4em;
+            }
+            .diff-counter {
+                font-size: 1.4em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="simCanvas"></canvas>
+
+<!-- ═══ MOBILE MENU BUTTON ═══ -->
+<button id="btnMenu" aria-label="Menú de paneles">☰</button>
+
+<!-- ═══ MOBILE DRAWER ═══ -->
+<div id="mobileDrawer" role="dialog" aria-modal="true" aria-label="Menú de paneles">
+    <div id="drawerOverlay"></div>
+    <div id="drawerContent">
+        <h4>📡 Paneles</h4>
+        <button class="drawer-btn" data-panel="panelFisica">⚫ Física</button>
+        <button class="drawer-btn" data-panel="panelNave">🚀 Nave</button>
+        <button class="drawer-btn" data-panel="panelExt">🌌 Externo</button>
+        <button class="drawer-btn" data-panel="panelTelemetria">📊 Telemetría</button>
+    </div>
+</div>
+
+<!-- ═══ ZOOM BUTTONS (mobile) ═══ -->
+<div id="zoomBtns">
+    <button id="btnZoomIn" aria-label="Aumentar zoom">＋</button>
+    <button id="btnZoomOut" aria-label="Reducir zoom">－</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANEL IZQUIERDO — Controles Físicos
+═══════════════════════════════════════════════════════ -->
+<div id="panelFisica" class="hud-panel">
+    <button class="panel-close-btn" data-panel="panelFisica" aria-label="Cerrar panel">×</button>
+    <h2>⚫ Dinámica Gravitacional</h2>
+
+    <!-- Masa -->
+    <div class="ctrl-group">
+        <div class="ctrl-label">
+            <span>Masa de la Singularidad (M☉)</span>
+            <span id="txtMass" class="metric-val">20.0 M☉</span>
+        </div>
+        <input type="range" id="massSlider" min="1" max="100" value="20" step="0.5" aria-label="Masa de la Singularidad en Masas Solares">
+        <span id="badgeExtrema" class="extreme-badge">⚠ MASA EXTREMA</span>
+        <input type="number" id="massInput" placeholder="Masa libre (ej: 1000000)" aria-label="Masa libre en masas solares">
+        <button id="btnApplyMass" class="cmd-btn" style="margin-top:6px;">Aplicar Masa</button>
+    </div>
+
+    <!-- Distancia -->
+    <div class="ctrl-group">
+        <div class="ctrl-label">
+            <span>Distancia de la Nave (× rs)</span>
+            <span id="txtDist" class="metric-val">4.00 × rs</span>
+        </div>
+        <input type="range" id="distSlider" min="1.001" max="500" value="4" step="0.001" aria-label="Distancia de la Nave en múltiplos del radio de Schwarzschild">
+        <div class="metric-row" style="margin-top:5px;">
+            <span>Distancia en km:</span>
+            <span id="txtDistKm" class="metric-val">—</span>
+        </div>
+        <button id="btnDistMode" class="cmd-btn" style="margin-top:5px;">Mostrar en: KM</button>
+    </div>
+
+    <!-- Zoom visual -->
+    <div class="ctrl-group">
+        <div class="ctrl-label">
+            <span>Zoom Visual (solo escala)</span>
+            <span id="txtZoom" class="metric-val">1.00×</span>
+        </div>
+        <input type="range" id="zoomSlider" min="0.1" max="3.0" value="1.0" step="0.05" aria-label="Zoom visual de la escena">
+    </div>
+
+    <!-- Velocidad de tiempo -->
+    <div class="ctrl-group">
+        <div class="ctrl-label"><span>Velocidad del Tiempo Simulado</span></div>
+        <select id="overdriveSelect" aria-label="Velocidad del tiempo simulado">
+            <option value="1">× 1 (tiempo real)</option>
+            <option value="60">× 60 (1 min / s real)</option>
+            <option value="3600" selected>× 3600 (1 h / s real)</option>
+            <option value="86400">× 86400 (1 día / s real)</option>
+            <option value="31536000">× 31536000 (1 año / s real)</option>
+        </select>
+    </div>
+
+    <hr class="sep">
+
+    <!-- Métricas -->
+    <div class="metric-row">
+        <span>Radio Schwarzschild (rs):</span>
+        <span id="txtRs" class="metric-val">—</span>
+    </div>
+    <div class="metric-row">
+        <span>Factor Dilatación γ:</span>
+        <span id="txtGamma" class="metric-val">—</span>
+    </div>
+    <div class="metric-row">
+        <span>Gravedad Local (propia):</span>
+        <span id="txtGravity" class="metric-val">—</span>
+    </div>
+
+    <hr class="sep">
+
+    <div class="two-btns">
+        <button id="btnReset" class="cmd-btn danger">↺ Reset Relojes</button>
+        <button id="btnPerspectiva" class="cmd-btn amber">⇄ Perspectiva</button>
+    </div>
+
+    <div class="hint">
+        Arrastra el orbe en el canvas • Rueda/Pinch = zoom • Mayor masa → mayor rs → mayor dilatación temporal a igual distancia en km
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANEL CENTRAL-SUPERIOR — Reloj Nave
+═══════════════════════════════════════════════════════ -->
+<div id="panelNave" class="hud-panel">
+    <button class="panel-close-btn" data-panel="panelNave" aria-label="Cerrar panel">×</button>
+    <h3>🚀 Tiempo Propio (Nave)</h3>
+    <div id="clockNave" class="digital-clock">00:00:00</div>
+    <div id="labelNave" class="clock-unit-label">0a 0d 00h 00m 00s</div>
+    <div class="clock-bar-bg"><div id="barNave" class="clock-bar-fill"></div></div>
+    <div class="clock-rate-label">Tasa: <span id="rateNave">1.0000×</span></div>
+    <div id="shiftNave" class="shift-label" style="color:#9ca3af;">⚪ Tasa Natural (1.0x)</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANEL DERECHO-SUPERIOR — Reloj Externo
+═══════════════════════════════════════════════════════ -->
+<div id="panelExt" class="hud-panel">
+    <button class="panel-close-btn" data-panel="panelExt" aria-label="Cerrar panel">×</button>
+    <h3>🌌 Tiempo Coordenado (Externo)</h3>
+    <div id="clockExt" class="digital-clock">00:00:00</div>
+    <div id="labelExt" class="clock-unit-label">0a 0d 00h 00m 00s</div>
+    <div class="clock-bar-bg"><div id="barExt" class="clock-bar-fill"></div></div>
+    <div class="clock-rate-label">Tasa: <span id="rateExt">1.0000×</span></div>
+    <div id="shiftExt" class="shift-label" style="color:#38bdf8;">⚪ Tasa Natural (1.0x)</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANEL INFERIOR-CENTRAL — Telemetría
+═══════════════════════════════════════════════════════ -->
+<div id="panelTelemetria" class="hud-panel">
+    <button class="panel-close-btn" data-panel="panelTelemetria" aria-label="Cerrar panel">×</button>
+    <div id="badgePerspectiva" class="status-badge">Perspectiva: Nave</div>
+    <div style="font-size:0.92em;color:#9ca3af;letter-spacing:1px;">Desfase Cronológico Relativista Total</div>
+    <div id="dispDesfase" class="diff-counter">0 Días, 00h 00m 00s</div>
+    <div class="hint">
+        Cuanto más cerca del horizonte de eventos, mayor la dilatación temporal. Cambia perspectiva para invertir la referencia.
+    </div>
+</div>
+
+<script>
+    /* ══════════════════════════════════════════════════════════════
+       CONSTANTES FÍSICAS (Sistema Internacional)
+    ══════════════════════════════════════════════════════════════ */
+    const G       = 6.67430e-11;   // m³ kg⁻¹ s⁻²
+    const C       = 299792458;     // m/s
+    const M_SOL   = 1.9891e30;     // kg
+    const C_SQR   = C * C;
+    const BASE_PX = 75;            // píxeles por rs a zoom=1
+    const SECS_PER_YEAR = 31536000; // 365 × 24 × 3600
+    let OVERDRIVE = 3600;          // 1 s real = 1 h simulada (ajustable)
+
+    /* ══════════════════════════════════════════════════════════════
+       ESTADO GLOBAL
+    ══════════════════════════════════════════════════════════════ */
+    let massKg   = 20 * M_SOL;
+    let rs_m     = 0;
+    let rs_km    = 0;
+
+    // Posición física: unidades de rs (variable principal)
+    let shipRs   = 4.0;
+    let shipKm   = 0;            // inicializado antes del loop
+    let distMode = 'rs';         // 'rs' | 'km'
+
+    let customMass = null;       // null = usar slider
+    let zoomScale  = 1.0;
+
+    let isCursorEngaged = false;
+
+    let tNave = 0;
+    let tExt  = 0;
+
+    let perspectiva = 'nave';    // 'nave' | 'externo'
+
+    let tPrev = performance.now();
+
+    let cX, cY;                  // coords del agujero negro en canvas
+
+    const isMobile = () => window.innerWidth <= 768;
+
+    /* ══════════════════════════════════════════════════════════════
+       REFERENCIAS DOM
+    ══════════════════════════════════════════════════════════════ */
+    const canvas      = document.getElementById('simCanvas');
+    const ctx         = canvas.getContext('2d', { alpha: false });
+
+    const massSlider  = document.getElementById('massSlider');
+    const massInput   = document.getElementById('massInput');
+    const distSlider  = document.getElementById('distSlider');
+    const btnDistMode = document.getElementById('btnDistMode');
+    const zoomSlider  = document.getElementById('zoomSlider');
+
+    const txtMass     = document.getElementById('txtMass');
+    const txtRs       = document.getElementById('txtRs');
+    const txtDist     = document.getElementById('txtDist');
+    const txtDistKm   = document.getElementById('txtDistKm');
+    const txtGamma    = document.getElementById('txtGamma');
+    const txtGravity  = document.getElementById('txtGravity');
+    const txtZoom     = document.getElementById('txtZoom');
+    const badgeExtrema = document.getElementById('badgeExtrema');
+
+    const clockNave   = document.getElementById('clockNave');
+    const clockExt    = document.getElementById('clockExt');
+    const labelNave   = document.getElementById('labelNave');
+    const labelExt    = document.getElementById('labelExt');
+    const barNave     = document.getElementById('barNave');
+    const barExt      = document.getElementById('barExt');
+    const rateNaveEl  = document.getElementById('rateNave');
+    const rateExtEl   = document.getElementById('rateExt');
+    const shiftNave   = document.getElementById('shiftNave');
+    const shiftExt    = document.getElementById('shiftExt');
+
+    const badgePerspectiva = document.getElementById('badgePerspectiva');
+    const dispDesfase      = document.getElementById('dispDesfase');
+    const btnReset         = document.getElementById('btnReset');
+    const btnPerspectiva   = document.getElementById('btnPerspectiva');
+    const panelNave        = document.getElementById('panelNave');
+    const panelExt         = document.getElementById('panelExt');
+
+    /* ══════════════════════════════════════════════════════════════
+       INICIALIZACIÓN Y RESIZE
+    ══════════════════════════════════════════════════════════════ */
+    function resizeCanvas() {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+        if (isMobile()) {
+            cX = window.innerWidth  * 0.5;
+            cY = window.innerHeight * 0.45;
+        } else {
+            cX = window.innerWidth  * 0.18;
+            cY = window.innerHeight * 0.5;
+        }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Inicializar shipKm antes del loop
+    (function initShipKm() {
+        const rs_init = (2 * G * 20 * M_SOL) / C_SQR;
+        shipKm = 4.0 * rs_init / 1000;
+    })();
+
+    /* ══════════════════════════════════════════════════════════════
+       MOTOR DE FÍSICA
+    ══════════════════════════════════════════════════════════════ */
+    function solvePhysics() {
+        // 1. Masa
+        let mSol = customMass !== null
+            ? customMass
+            : parseFloat(massSlider.value);
+        massKg = mSol * M_SOL;
+        rs_m   = (2 * G * massKg) / C_SQR;
+        rs_km  = rs_m / 1000;
+
+        // 2. Distancia: shipKm es la coordenada fija en km; shipRs se deriva siempre.
+        if (rs_km > 0) shipRs = shipKm / rs_km;
+
+        // 3. Límite mínimo: nunca cruzar el horizonte
+        if (shipRs < 1.001) {
+            shipRs = 1.001;
+            shipKm = shipRs * rs_km;
+        }
+
+        // 4. Factor de dilatación (métrica de Schwarzschild)
+        // γ = sqrt(1 − rs/r)
+        let rsOverR = 1.0 / shipRs;
+        if (rsOverR > 0.9999) rsOverR = 0.9999;
+        let gamma = Math.sqrt(1.0 - rsOverR);
+        if (!isFinite(gamma) || gamma <= 0) gamma = 1e-5;
+
+        // 5. Gravedad propia (fuerza relativista)
+        let r_real  = shipRs * rs_m;
+        let gAccel  = (G * massKg) / (r_real * r_real * gamma);
+        let gLocal  = gAccel / 9.80665;
+
+        // 6. Actualizar DOM
+        txtMass.textContent    = mSol.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' M☉';
+        badgeExtrema.style.display = mSol > 1000 ? 'inline-block' : 'none';
+        txtRs.textContent      = rs_km.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' km';
+
+        if (distMode === 'rs') {
+            txtDist.textContent = shipRs.toFixed(2) + ' × rs';
+        } else {
+            txtDist.textContent = shipKm.toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' km';
+        }
+        txtDistKm.textContent = shipKm.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' km';
+        txtGamma.textContent   = gamma.toFixed(6);
+        txtGravity.textContent = gLocal > 999999
+            ? gLocal.toExponential(3) + ' g'
+            : gLocal.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' g';
+
+        // 7. Sincronizar slider (no cuando el usuario lo arrastra)
+        if (!isCursorEngaged) {
+            distSlider.value = Math.min(Math.max(shipRs, 1.05), 500);
+        }
+
+        return gamma;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       FORMATO DE TIEMPO
+    ══════════════════════════════════════════════════════════════ */
+    function fmtTime(secs) {
+        let yr = Math.floor(secs / SECS_PER_YEAR);
+        let rem = secs % SECS_PER_YEAR;
+        let d  = Math.floor(rem / 86400);
+        let h  = Math.floor((rem % 86400) / 3600);
+        let m  = Math.floor((rem % 3600)  / 60);
+        let s  = Math.floor(rem % 60);
+        let totalH = Math.floor(secs / 3600);
+        let hh = String(totalH).padStart(2, '0');
+        let mm = String(m).padStart(2, '0');
+        let ss = String(s).padStart(2, '0');
+        let label = `${yr}a ${d}d ${String(h).padStart(2,'0')}h ${mm}m ${ss}s`;
+        return {
+            clock: `${hh}:${mm}:${ss}`,
+            full:  `${yr > 0 ? yr + 'a ' : ''}${d} Días, ${String(h).padStart(2,'0')}h ${mm}m ${ss}s`,
+            label
+        };
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       UI DE RELOJES (Redshift / Blueshift)
+    ══════════════════════════════════════════════════════════════ */
+    function updateClockUI(gamma) {
+        let rateNave = (perspectiva === 'nave') ? 1.0 : gamma;
+        let rateExt  = (perspectiva === 'nave') ? (1.0 / gamma) : 1.0;
+
+        // t goes from 0 (far, gamma=1) to 1 (horizon, gamma=0)
+        let horizonProximity = Math.pow(1.0 - gamma, 0.5);
+
+        // ── Ship clock ──
+        if (rateNave < 0.9999) {
+            let gv = Math.round(255 * (1.0 - horizonProximity));
+            let bv = Math.round(255 * (1.0 - horizonProximity));
+            let col = `rgb(255,${gv},${bv})`;
+            clockNave.style.color      = col;
+            clockNave.style.textShadow = `0 0 ${Math.round(horizonProximity*20)}px rgba(239,68,68,${horizonProximity.toFixed(2)})`;
+            shiftNave.textContent = (gamma < 0.5)
+                ? `🔴 REDSHIFT EXTREMO — γ=${gamma.toFixed(6)}`
+                : `🔴 REDSHIFT — Tiempo Dilatado (γ=${gamma.toFixed(6)})`;
+            shiftNave.style.color         = col;
+            barNave.style.width           = Math.max(gamma * 100, 0.5) + '%';
+            barNave.style.backgroundColor = col;
+        } else {
+            clockNave.style.color         = '#ffffff';
+            clockNave.style.textShadow    = '0 0 6px rgba(255,255,255,0.3)';
+            shiftNave.textContent         = '⚪ Tasa Natural (1.0×)';
+            shiftNave.style.color         = '#9ca3af';
+            barNave.style.width           = '100%';
+            barNave.style.backgroundColor = '#38bdf8';
+        }
+        rateNaveEl.textContent = rateNave.toFixed(6) + '×';
+
+        // ── External clock ──
+        if (rateExt > 1.0001) {
+            let rv = Math.round(255 * (1.0 - horizonProximity));
+            let gv = Math.round(189 + (255 - 189) * (1.0 - horizonProximity));
+            let col = `rgb(${rv},${gv},255)`;
+            clockExt.style.color      = col;
+            clockExt.style.textShadow = `0 0 ${Math.round(horizonProximity*24)}px rgba(56,189,248,${Math.min(horizonProximity*1.5,1).toFixed(2)})`;
+            shiftExt.textContent = (rateExt > 10)
+                ? `🔵 BLUESHIFT EXTREMO — ${rateExt.toFixed(2)}× más rápido`
+                : `🔵 BLUESHIFT — Tiempo Comprimido (${rateExt.toFixed(4)}×)`;
+            shiftExt.style.color         = col;
+            barExt.style.width           = '100%';
+            barExt.style.backgroundColor = (rateExt > 5) ? '#22c55e' : col;
+        } else {
+            clockExt.style.color         = '#ffffff';
+            clockExt.style.textShadow    = '0 0 6px rgba(255,255,255,0.3)';
+            shiftExt.textContent         = '⚪ Tasa Natural (1.0×)';
+            shiftExt.style.color         = '#9ca3af';
+            barExt.style.width           = '100%';
+            barExt.style.backgroundColor = '#38bdf8';
+        }
+        rateExtEl.textContent = rateExt.toFixed(6) + '×';
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       RENDERIZADO
+    ══════════════════════════════════════════════════════════════ */
+    function getVX() {
+        return Math.min(cX + shipRs * BASE_PX * zoomScale, canvas.width - 12);
+    }
+
+    function render(gamma) {
+        let ePx = BASE_PX * zoomScale;
+
+        // Fondo
+        ctx.fillStyle = '#0c0f12';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Estrellas de fondo
+        ctx.save();
+        let numStars = 180;
+        let seed = 42;
+        function rng() { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; }
+        seed = 42;
+        for (let i = 0; i < numStars; i++) {
+            let sx = rng() * canvas.width;
+            let sy = rng() * canvas.height;
+            let sr = rng() * 1.2 + 0.3;
+            let sa = rng() * 0.5 + 0.2;
+            ctx.beginPath();
+            ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${sa})`;
+            ctx.fill();
+        }
+        ctx.restore();
+
+        let diskR     = ePx * 5.0;
+        let closeness = Math.max(0, 1 - (shipRs - 1.0) / 2.0);
+
+        ctx.save();
+        ctx.translate(cX, cY);
+
+        // ── Disco de acreción ──
+        let ag = ctx.createRadialGradient(-ePx * 0.4, 0, ePx * 0.5, 0, 0, diskR);
+        ag.addColorStop(0,    'rgba(255,255,255,0.95)');
+        ag.addColorStop(0.15, `rgba(234,88,12,${0.75 + closeness * 0.2})`);
+        ag.addColorStop(0.35, `rgba(220,38,38,${0.4  + closeness * 0.3})`);
+        ag.addColorStop(0.7,  'rgba(125,20,20,0.12)');
+        ag.addColorStop(1,    'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, diskR * 0.8, diskR, 0, 0, Math.PI * 2);
+        ctx.fillStyle = ag;
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+
+        // ── Sombra fotónica ──
+        let sR = ePx * 2.6;
+        ctx.beginPath();
+        ctx.arc(-ePx * 0.45, 0, sR, 0, Math.PI * 2);
+        ctx.fillStyle = '#0c0f12';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(-ePx * 0.45, 0, sR, 0, Math.PI * 2);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255,220,150,0.35)';
+        ctx.stroke();
+
+        // ── Singularidad ──
+        ctx.beginPath();
+        ctx.arc(0, 0, ePx, 0, Math.PI * 2);
+        ctx.fillStyle = '#000';
+        ctx.fill();
+
+        ctx.restore();
+
+        // ── Línea de referencia ──
+        ctx.beginPath();
+        ctx.moveTo(cX, cY);
+        ctx.lineTo(canvas.width, cY);
+        ctx.strokeStyle = 'rgba(100,116,139,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // ── Orbe nave ──
+        let vx = getVX();
+        let shipColor = perspectiva === 'nave' ? '#f59e0b' : '#38bdf8';
+
+        ctx.beginPath();
+        ctx.arc(vx, cY, 9, 0, Math.PI * 2);
+        ctx.fillStyle = shipColor;
+        ctx.shadowBlur  = 22;
+        ctx.shadowColor = shipColor;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // ── Etiqueta nave ──
+        ctx.fillStyle = 'rgba(209,213,219,0.85)';
+        ctx.font      = "12px 'Consolas',monospace";
+        ctx.textAlign = 'center';
+        ctx.fillText('Módulo Cautivo', vx, cY - 22);
+        ctx.fillStyle = 'rgba(200,220,240,0.7)';
+        ctx.font      = "11px 'Consolas',monospace";
+        ctx.textAlign = 'center';
+        ctx.fillText('r=' + shipRs.toFixed(3) + '×rs  γ=' + gamma.toFixed(6), vx, cY + 20);
+
+        // ── Indicador fuera de canvas ──
+        if (cX + shipRs * BASE_PX * zoomScale > canvas.width - 15) {
+            ctx.fillStyle = 'rgba(245,158,11,0.9)';
+            ctx.font      = "bold 11px 'Consolas',monospace";
+            ctx.textAlign = 'right';
+            ctx.fillText(
+                '→ NAVE MÁS ALLÁ (' + shipRs.toFixed(1) + ' × rs)',
+                canvas.width - 15, cY - 18
+            );
+        }
+
+        // ── Etiqueta del epicentro ──
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font      = "11px 'Consolas',monospace";
+        ctx.textAlign = 'center';
+        ctx.fillText('Epicentro Gravitacional', cX, cY + ePx * 3.8);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       BUCLE PRINCIPAL
+    ══════════════════════════════════════════════════════════════ */
+    function tick(ts) {
+        let dt    = Math.min((ts - tPrev) / 1000, 0.15);
+        tPrev     = ts;
+        let gamma = solvePhysics();
+
+        let base  = dt * OVERDRIVE;
+        if (perspectiva === 'nave') {
+            tNave += base;
+            tExt  += base / gamma;
+        } else {
+            tExt  += base;
+            tNave += base * gamma;
+        }
+
+        updateClockUI(gamma);
+
+        // Actualizar relojes en DOM
+        let fNave  = fmtTime(tNave);
+        let fExt   = fmtTime(tExt);
+        let fDelta = fmtTime(Math.abs(tExt - tNave));
+        clockNave.textContent  = fNave.clock;
+        clockExt.textContent   = fExt.clock;
+        labelNave.textContent  = fNave.label;
+        labelExt.textContent   = fExt.label;
+        dispDesfase.textContent = fDelta.full;
+
+        render(gamma);
+        requestAnimationFrame(tick);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       EVENTOS — MOUSE (desktop)
+    ══════════════════════════════════════════════════════════════ */
+
+    // Arrastre del orbe en el canvas (mouse)
+    canvas.addEventListener('mousedown', (e) => {
+        let vx = getVX();
+        let dx = e.clientX - vx;
+        let dy = e.clientY - cY;
+        if (Math.sqrt(dx * dx + dy * dy) < 40) {
+            isCursorEngaged = true;
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isCursorEngaged) return;
+        let rawRs = (e.clientX - cX) / (BASE_PX * zoomScale);
+        shipRs    = Math.max(1.001, rawRs);
+        shipKm    = shipRs * rs_km;
+        distMode  = 'rs';
+        btnDistMode.textContent = 'Mostrar en: KM';
+    });
+
+    window.addEventListener('mouseup', () => {
+        isCursorEngaged = false;
+    });
+
+    // Zoom con rueda del ratón
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        let delta = e.deltaY > 0 ? -0.05 : 0.05;
+        zoomScale = Math.round(Math.min(3.0, Math.max(0.1, zoomScale + delta)) * 100) / 100;
+        zoomSlider.value   = zoomScale;
+        txtZoom.textContent = zoomScale.toFixed(2) + '×';
+    }, { passive: false });
+
+    /* ══════════════════════════════════════════════════════════════
+       EVENTOS — TOUCH (mobile)
+    ══════════════════════════════════════════════════════════════ */
+
+    // Pinch-to-zoom state
+    let pinchStartDist = null;
+    let pinchStartZoom = zoomScale;
+
+    function getTouchDist(touches) {
+        let dx = touches[0].clientX - touches[1].clientX;
+        let dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Unified touchstart: handles 1-finger orb drag + 2-finger pinch
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            let touch = e.touches[0];
+            let vx = getVX();
+            let dx = touch.clientX - vx;
+            let dy = touch.clientY - cY;
+            if (Math.sqrt(dx * dx + dy * dy) < 48) {
+                isCursorEngaged = true;
+                e.preventDefault();
+            }
+        } else if (e.touches.length === 2) {
+            isCursorEngaged = false;
+            pinchStartDist = getTouchDist(e.touches);
+            pinchStartZoom = zoomScale;
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    // Unified touchmove: handles 1-finger orb drag + 2-finger pinch
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1 && isCursorEngaged) {
+            e.preventDefault();
+            let touch = e.touches[0];
+            let rawRs = (touch.clientX - cX) / (BASE_PX * zoomScale);
+            shipRs    = Math.max(1.001, rawRs);
+            shipKm    = shipRs * rs_km;
+            distMode  = 'rs';
+            btnDistMode.textContent = 'Mostrar en: KM';
+        } else if (e.touches.length === 2 && pinchStartDist !== null) {
+            e.preventDefault();
+            let currentDist = getTouchDist(e.touches);
+            let scale = currentDist / pinchStartDist;
+            zoomScale = Math.round(Math.min(3.0, Math.max(0.1, pinchStartZoom * scale)) * 100) / 100;
+            zoomSlider.value    = zoomScale;
+            txtZoom.textContent = zoomScale.toFixed(2) + '×';
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+            isCursorEngaged = false;
+            pinchStartDist = null;
+        }
+    }, { passive: true });
+
+    /* ══════════════════════════════════════════════════════════════
+       EVENTOS — SLIDERS Y CONTROLES
+    ══════════════════════════════════════════════════════════════ */
+
+    // Slider de zoom
+    zoomSlider.addEventListener('input', () => {
+        zoomScale = parseFloat(zoomSlider.value);
+        txtZoom.textContent = zoomScale.toFixed(2) + '×';
+    });
+
+    // Botones de zoom móvil
+    document.getElementById('btnZoomIn').addEventListener('click', () => {
+        zoomScale = Math.round(Math.min(3.0, zoomScale + 0.1) * 100) / 100;
+        zoomSlider.value    = zoomScale;
+        txtZoom.textContent = zoomScale.toFixed(2) + '×';
+    });
+    document.getElementById('btnZoomOut').addEventListener('click', () => {
+        zoomScale = Math.round(Math.max(0.1, zoomScale - 0.1) * 100) / 100;
+        zoomSlider.value    = zoomScale;
+        txtZoom.textContent = zoomScale.toFixed(2) + '×';
+    });
+
+    // Velocidad del tiempo
+    document.getElementById('overdriveSelect').addEventListener('change', (e) => {
+        OVERDRIVE = parseInt(e.target.value, 10);
+    });
+
+    // Slider de distancia
+    distSlider.addEventListener('input', () => {
+        shipRs = parseFloat(distSlider.value);
+        shipKm = shipRs * rs_km;
+    });
+
+    // Botón modo de distancia
+    btnDistMode.addEventListener('click', () => {
+        if (distMode === 'rs') {
+            distMode = 'km';
+            btnDistMode.textContent = 'Mostrar en: Rs';
+        } else {
+            distMode = 'rs';
+            btnDistMode.textContent = 'Mostrar en: KM';
+        }
+    });
+
+    // Slider de masa
+    massSlider.addEventListener('input', () => {
+        customMass = null;
+        massInput.value = '';
+    });
+
+    // Input libre de masa
+    function applyCustomMass() {
+        let val = parseFloat(massInput.value);
+        if (!isNaN(val) && val > 0 && val <= 1e9) {
+            customMass = val;
+            if (val >= 1 && val <= 100) {
+                massSlider.value = val;
+            }
+        }
+    }
+    massInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') applyCustomMass();
+    });
+    // Botón "Aplicar" para móvil (además de Enter)
+    document.getElementById('btnApplyMass').addEventListener('click', applyCustomMass);
+
+    // Reset relojes
+    btnReset.addEventListener('click', () => {
+        tNave = 0;
+        tExt  = 0;
+    });
+
+    // Cambio de perspectiva
+    btnPerspectiva.addEventListener('click', () => {
+        if (perspectiva === 'nave') {
+            perspectiva = 'externo';
+            badgePerspectiva.textContent      = 'Perspectiva: Externo';
+            badgePerspectiva.style.background = 'var(--cyan2)';
+            badgePerspectiva.style.color      = '#000';
+            panelExt.style.borderTopColor  = 'var(--amber)';
+            panelNave.style.borderTopColor = 'var(--cyan2)';
+        } else {
+            perspectiva = 'nave';
+            badgePerspectiva.textContent      = 'Perspectiva: Nave';
+            badgePerspectiva.style.background = 'var(--amber)';
+            badgePerspectiva.style.color      = '#000';
+            panelNave.style.borderTopColor = 'var(--amber)';
+            panelExt.style.borderTopColor  = 'var(--cyan2)';
+        }
+    });
+
+    /* ══════════════════════════════════════════════════════════════
+       MENÚ MÓVIL — Drawer logic
+    ══════════════════════════════════════════════════════════════ */
+    const mobileDrawer = document.getElementById('mobileDrawer');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    const btnMenu = document.getElementById('btnMenu');
+
+    function openDrawer() {
+        mobileDrawer.style.display = 'block';
+    }
+    function closeDrawer() {
+        mobileDrawer.style.display = 'none';
+    }
+
+    btnMenu.addEventListener('click', openDrawer);
+    drawerOverlay.addEventListener('click', closeDrawer);
+
+    // Drawer panel buttons
+    document.querySelectorAll('.drawer-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const panelId = btn.getAttribute('data-panel');
+            // Hide all panels
+            document.querySelectorAll('.hud-panel').forEach(p => {
+                p.classList.remove('mobile-visible');
+            });
+            // Show selected panel
+            const panel = document.getElementById(panelId);
+            if (panel) panel.classList.add('mobile-visible');
+            // Update active state in drawer
+            document.querySelectorAll('.drawer-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            closeDrawer();
+        });
+    });
+
+    // Close buttons inside panels
+    document.querySelectorAll('.panel-close-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const panelId = btn.getAttribute('data-panel');
+            const panel = document.getElementById(panelId);
+            if (panel) panel.classList.remove('mobile-visible');
+            // Clear active state in drawer
+            document.querySelectorAll('.drawer-btn').forEach(b => {
+                if (b.getAttribute('data-panel') === panelId) b.classList.remove('active');
+            });
+        });
+    });
+
+    /* ══════════════════════════════════════════════════════════════
+       ARRANQUE
+    ══════════════════════════════════════════════════════════════ */
+    requestAnimationFrame(tick);
+</script>
+</body>
+</html>
