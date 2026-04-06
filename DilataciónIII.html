@@ -261,11 +261,9 @@
             centerPointX = window.innerWidth * 0.18; // Desplazamiento asimétrico a la izquierda (foco natural)
             centerPointY = window.innerHeight / 2;
             
-            // Inicialización condicionada del punto de anclaje inicial de la entidad nave
-            if(posShipX === 0) {
-                posShipX = centerPointX + (baseRsRenderPixels * 4); // Ubicación lejana e inofensiva preliminar
-                posShipY = centerPointY;
-            }
+            // Recálculo del punto de anclaje de la entidad nave relativo al nuevo centro
+            posShipX = centerPointX + (baseRsRenderPixels * 4); // Ubicación lejana e inofensiva preliminar
+            posShipY = centerPointY;
         }
         window.addEventListener('resize', autoResizeCanvas);
         autoResizeCanvas();
@@ -300,7 +298,10 @@
 
             // Algoritmo Relativista Subyacente (Cálculo del Factor de Extrema Dilatación asintótica inversa)
             // Dilatation = sqrt(1 - (r_s / r))
-            let factorDilationGrav = Math.sqrt(1 - (radioSchwarzschild_metros / realDistMetrosRadial));
+            let ratio = radioSchwarzschild_metros / realDistMetrosRadial;
+            ratio = Math.min(ratio, 0.9999); // nunca llegar a 1 ni superarlo
+            let factorDilationGrav = Math.sqrt(1 - ratio);
+            if (!isFinite(factorDilationGrav) || factorDilationGrav <= 0) factorDilationGrav = 0.0001;
 
             // Extrapolación Numérica Magnitudinal de la Fuerza Gravitatoria Vectorial Relativista o Fuerza de Aceleración Propia requerida
             // a_propia = (G * M) / (r^2 * sqrt(1 - r_s/r))
@@ -469,9 +470,9 @@
             drawCtx.lineTo(renderCanvas.width, centerPointY);
             drawCtx.strokeStyle = "rgba(100, 116, 139, 0.3)";
             drawCtx.lineWidth = 1.5;
-            drawCtx.setLineDash();
+            drawCtx.setLineDash([]);
             drawCtx.stroke();
-            drawCtx.setLineDash();
+            drawCtx.setLineDash([]);
 
             // Entidad interactiva y núcleo biológico / sensórico ("Nave o bolita estática artificial")
             drawCtx.beginPath();
