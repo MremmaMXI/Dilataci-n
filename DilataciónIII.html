@@ -95,7 +95,7 @@
             margin: 6px 0;
             letter-spacing: 2px;
             text-shadow: 0 0 8px rgba(56,189,248,0.5);
-            transition: color 0.3s, text-shadow 0.3s;
+            transition: color 0.15s, text-shadow 0.15s;
         }
 
         .diff-counter {
@@ -285,7 +285,7 @@
             <span>Distancia de la Nave (× rs)</span>
             <span id="txtDist" class="metric-val">4.00 × rs</span>
         </div>
-        <input type="range" id="distSlider" min="1.05" max="500" value="4" step="0.05" aria-label="Distancia de la Nave en múltiplos del radio de Schwarzschild">
+        <input type="range" id="distSlider" min="1.001" max="500" value="4" step="0.001" aria-label="Distancia de la Nave en múltiplos del radio de Schwarzschild">
         <div class="metric-row" style="margin-top:5px;">
             <span>Distancia en km:</span>
             <span id="txtDistKm" class="metric-val">—</span>
@@ -476,8 +476,8 @@
         }
 
         // 3. Límite mínimo: nunca cruzar el horizonte
-        if (shipRs < 1.03) {
-            shipRs = 1.03;
+        if (shipRs < 1.001) {
+            shipRs = 1.001;
             shipKm = shipRs * rs_km;
         }
 
@@ -541,43 +541,56 @@
         let rateNave = (perspectiva === 'nave') ? 1.0 : gamma;
         let rateExt  = (perspectiva === 'nave') ? (1.0 / gamma) : 1.0;
 
-        // ── Reloj Nave ──
-        if (rateNave < 0.9999) {
-            // LENTO → Redshift
-            clockNave.style.color      = '#ef4444';
-            clockNave.style.textShadow = '0 0 14px rgba(239,68,68,0.9)';
-            shiftNave.textContent      = '🔴 REDSHIFT — Tiempo Dilatado';
-            shiftNave.style.color      = '#ef4444';
-            barNave.style.width            = Math.max(rateNave * 100, 1) + '%';
-            barNave.style.backgroundColor  = rateNave < 0.3 ? '#7f1d1d' : '#ef4444';
-        } else {
-            clockNave.style.color      = '#fff';
-            clockNave.style.textShadow = '0 0 8px rgba(56,189,248,0.5)';
-            shiftNave.textContent      = '⚪ Tasa Natural (1.0×)';
-            shiftNave.style.color      = '#9ca3af';
-            barNave.style.width            = '100%';
-            barNave.style.backgroundColor  = '#38bdf8';
-        }
-        rateNaveEl.textContent = rateNave.toFixed(4) + '×';
+        // t goes from 0 (far, gamma=1) to 1 (horizon, gamma=0)
+        let horizonProximity = Math.pow(1.0 - gamma, 0.5);
 
-        // ── Reloj Externo ──
-        if (rateExt > 1.0001) {
-            // RÁPIDO → Blueshift
-            clockExt.style.color      = '#38bdf8';
-            clockExt.style.textShadow = '0 0 16px rgba(56,189,248,1.0)';
-            shiftExt.textContent      = '🔵 BLUESHIFT — Tiempo Comprimido';
-            shiftExt.style.color      = '#38bdf8';
-            barExt.style.width            = '100%';
-            barExt.style.backgroundColor  = rateExt > 5 ? '#22c55e' : '#38bdf8';
+        // ── Ship clock ──
+        if (rateNave < 0.9999) {
+            // Interpolate white → red based on proximity
+            let gv = Math.round(255 * (1.0 - horizonProximity));
+            let bv = Math.round(255 * (1.0 - horizonProximity));
+            let col = `rgb(255,${gv},${bv})`;
+            clockNave.style.color      = col;
+            clockNave.style.textShadow = `0 0 ${Math.round(horizonProximity*20)}px rgba(239,68,68,${horizonProximity.toFixed(2)})`;
+            shiftNave.textContent = (gamma < 0.5)
+                ? `🔴 REDSHIFT EXTREMO — γ=${gamma.toFixed(6)}`
+                : `🔴 REDSHIFT — Tiempo Dilatado (γ=${gamma.toFixed(6)})`;
+            shiftNave.style.color         = col;
+            barNave.style.width           = Math.max(gamma * 100, 0.5) + '%';
+            barNave.style.backgroundColor = col;
         } else {
-            clockExt.style.color      = '#fff';
-            clockExt.style.textShadow = '0 0 8px rgba(56,189,248,0.5)';
-            shiftExt.textContent      = '⚪ Tasa Natural (1.0×)';
-            shiftExt.style.color      = '#9ca3af';
-            barExt.style.width            = '100%';
-            barExt.style.backgroundColor  = '#38bdf8';
+            clockNave.style.color         = '#ffffff';
+            clockNave.style.textShadow    = '0 0 6px rgba(255,255,255,0.3)';
+            shiftNave.textContent         = '⚪ Tasa Natural (1.0×)';
+            shiftNave.style.color         = '#9ca3af';
+            barNave.style.width           = '100%';
+            barNave.style.backgroundColor = '#38bdf8';
         }
-        rateExtEl.textContent = rateExt.toFixed(4) + '×';
+        rateNaveEl.textContent = rateNave.toFixed(6) + '×';
+
+        // ── External clock ──
+        if (rateExt > 1.0001) {
+            // Interpolate white → cyan based on proximity
+            let rv = Math.round(255 * (1.0 - horizonProximity));
+            let gv = Math.round(189 + (255 - 189) * (1.0 - horizonProximity));
+            let col = `rgb(${rv},${gv},255)`;
+            clockExt.style.color      = col;
+            clockExt.style.textShadow = `0 0 ${Math.round(horizonProximity*24)}px rgba(56,189,248,${Math.min(horizonProximity*1.5,1).toFixed(2)})`;
+            shiftExt.textContent = (rateExt > 10)
+                ? `🔵 BLUESHIFT EXTREMO — ${rateExt.toFixed(2)}× más rápido`
+                : `🔵 BLUESHIFT — Tiempo Comprimido (${rateExt.toFixed(4)}×)`;
+            shiftExt.style.color         = col;
+            barExt.style.width           = '100%';
+            barExt.style.backgroundColor = (rateExt > 5) ? '#22c55e' : col;
+        } else {
+            clockExt.style.color         = '#ffffff';
+            clockExt.style.textShadow    = '0 0 6px rgba(255,255,255,0.3)';
+            shiftExt.textContent         = '⚪ Tasa Natural (1.0×)';
+            shiftExt.style.color         = '#9ca3af';
+            barExt.style.width           = '100%';
+            barExt.style.backgroundColor = '#38bdf8';
+        }
+        rateExtEl.textContent = rateExt.toFixed(6) + '×';
     }
 
     /* ══════════════════════════════════════════════════════════════
@@ -592,12 +605,6 @@
 
         // Fondo
         ctx.fillStyle = '#0c0f12';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Tinte de perspectiva
-        ctx.fillStyle = perspectiva === 'externo'
-            ? 'rgba(239,68,68,0.05)'
-            : 'rgba(56,189,248,0.05)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Estrellas de fondo
@@ -687,6 +694,10 @@
         ctx.font      = "12px 'Consolas',monospace";
         ctx.textAlign = 'center';
         ctx.fillText('Módulo Cautivo', vx, cY - 22);
+        ctx.fillStyle = 'rgba(200,220,240,0.7)';
+        ctx.font      = "11px 'Consolas',monospace";
+        ctx.textAlign = 'center';
+        ctx.fillText('r=' + shipRs.toFixed(3) + '×rs  γ=' + gamma.toFixed(6), vx, cY + 20);
 
         // ── Indicador fuera de canvas ──
         if (cX + shipRs * BASE_PX * zoomScale > canvas.width - 15) {
@@ -754,7 +765,7 @@
     window.addEventListener('mousemove', (e) => {
         if (!isCursorEngaged) return;
         let rawRs = (e.clientX - cX) / (BASE_PX * zoomScale);
-        shipRs    = Math.max(1.03, rawRs);
+        shipRs    = Math.max(1.001, rawRs);
         shipKm    = shipRs * rs_km;
         // Mantener modo 'rs' cuando arrastramos (simplifica sincronización)
         distMode  = 'rs';
