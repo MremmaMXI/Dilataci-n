@@ -285,7 +285,7 @@
             <span>Distancia de la Nave (× rs)</span>
             <span id="txtDist" class="metric-val">4.00 × rs</span>
         </div>
-        <input type="range" id="distSlider" min="1.001" max="500" value="4" step="0.05" aria-label="Distancia de la Nave en múltiplos del radio de Schwarzschild">
+        <input type="range" id="distSlider" min="1.001" max="500" value="4" step="0.001" aria-label="Distancia de la Nave en múltiplos del radio de Schwarzschild">
         <div class="metric-row" style="margin-top:5px;">
             <span>Distancia en km:</span>
             <span id="txtDistKm" class="metric-val">—</span>
@@ -542,16 +542,16 @@
         let rateExt  = (perspectiva === 'nave') ? (1.0 / gamma) : 1.0;
 
         // t goes from 0 (far, gamma=1) to 1 (horizon, gamma=0)
-        let t = Math.pow(1.0 - gamma, 0.5);
+        let horizonProximity = Math.pow(1.0 - gamma, 0.5);
 
         // ── Ship clock ──
         if (rateNave < 0.9999) {
             // Interpolate white → red based on proximity
-            let gv = Math.round(255 * (1.0 - t));
-            let bv = Math.round(255 * (1.0 - t));
+            let gv = Math.round(255 * (1.0 - horizonProximity));
+            let bv = Math.round(255 * (1.0 - horizonProximity));
             let col = `rgb(255,${gv},${bv})`;
             clockNave.style.color      = col;
-            clockNave.style.textShadow = `0 0 ${Math.round(t*20)}px rgba(239,68,68,${t.toFixed(2)})`;
+            clockNave.style.textShadow = `0 0 ${Math.round(horizonProximity*20)}px rgba(239,68,68,${horizonProximity.toFixed(2)})`;
             shiftNave.textContent = (gamma < 0.5)
                 ? `🔴 REDSHIFT EXTREMO — γ=${gamma.toFixed(6)}`
                 : `🔴 REDSHIFT — Tiempo Dilatado (γ=${gamma.toFixed(6)})`;
@@ -571,11 +571,11 @@
         // ── External clock ──
         if (rateExt > 1.0001) {
             // Interpolate white → cyan based on proximity
-            let rv = Math.round(255 * (1.0 - t));
-            let gv = Math.round(189 + (255 - 189) * (1.0 - t));
+            let rv = Math.round(255 * (1.0 - horizonProximity));
+            let gv = Math.round(189 + (255 - 189) * (1.0 - horizonProximity));
             let col = `rgb(${rv},${gv},255)`;
             clockExt.style.color      = col;
-            clockExt.style.textShadow = `0 0 ${Math.round(t*24)}px rgba(56,189,248,${Math.min(t*1.5,1).toFixed(2)})`;
+            clockExt.style.textShadow = `0 0 ${Math.round(horizonProximity*24)}px rgba(56,189,248,${Math.min(horizonProximity*1.5,1).toFixed(2)})`;
             shiftExt.textContent = (rateExt > 10)
                 ? `🔵 BLUESHIFT EXTREMO — ${rateExt.toFixed(2)}× más rápido`
                 : `🔵 BLUESHIFT — Tiempo Comprimido (${rateExt.toFixed(4)}×)`;
