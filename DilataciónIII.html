@@ -254,7 +254,8 @@
                     <span id="massExtremeBadge" class="mass-extreme-badge">⚠ MASA EXTREMA</span>
                 </span>
             </div>
-            <input type="number" id="massCustomInput" class="mass-custom-input" placeholder="Ej: 10000 (Enter para aplicar)">
+            <label for="massCustomInput" style="display:block;font-size:0.82em;color:#9ca3af;margin-top:6px;">Masa libre (M☉) — Enter para aplicar:</label>
+            <input type="number" id="massCustomInput" class="mass-custom-input" placeholder="Ej: 10000">
         </div>
         
         <div class="metric-row">
@@ -483,7 +484,7 @@
         // Input numérico de masa personalizada
         function applyCustomMass() {
             let val = parseFloat(document.getElementById('massCustomInput').value);
-            if (!isNaN(val) && val > 0) {
+            if (!isNaN(val) && val > 0 && val <= 1e9) {
                 customMassOverride = val;
                 // Sincronizar slider si el valor cabe en su rango
                 if (val >= 1 && val <= 100) {
