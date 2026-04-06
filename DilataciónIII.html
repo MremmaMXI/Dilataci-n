@@ -334,7 +334,7 @@
             <option value="60">× 60 (1 min / s real)</option>
             <option value="3600" selected>× 3600 (1 h / s real)</option>
             <option value="86400">× 86400 (1 día / s real)</option>
-            <option value="31536000">× 31 536 000 (1 año / s real)</option>
+            <option value="31536000">× 31536000 (1 año / s real)</option>
         </select>
     </div>
 
@@ -411,6 +411,7 @@
     const M_SOL   = 1.9891e30;     // kg
     const C_SQR   = C * C;
     const BASE_PX = 75;            // píxeles por rs a zoom=1
+    const SECS_PER_YEAR = 31536000; // 365 × 24 × 3600
     let OVERDRIVE = 3600;          // 1 s real = 1 h simulada (ajustable)
 
     /* ══════════════════════════════════════════════════════════════
@@ -509,7 +510,8 @@
         rs_km  = rs_m / 1000;
 
         // 2. Distancia: shipKm es la coordenada fija en km; shipRs se deriva siempre.
-        //    Así al cambiar la masa (que cambia rs_km) la dilatación varía correctamente.
+        //    Así, al cambiar la masa (que cambia rs_km), shipRs varía y la dilatación
+        //    se actualiza correctamente. distMode solo afecta la visualización del label.
         if (rs_km > 0) shipRs = shipKm / rs_km;
 
         // 3. Límite mínimo: nunca cruzar el horizonte
@@ -558,13 +560,13 @@
        FORMATO DE TIEMPO
     ══════════════════════════════════════════════════════════════ */
     function fmtTime(secs) {
-        let yr = Math.floor(secs / 31536000);
-        let rem = secs % 31536000;
+        let yr = Math.floor(secs / SECS_PER_YEAR);
+        let rem = secs % SECS_PER_YEAR;
         let d  = Math.floor(rem / 86400);
         let h  = Math.floor((rem % 86400) / 3600);
         let m  = Math.floor((rem % 3600)  / 60);
         let s  = Math.floor(rem % 60);
-        let totalH = yr * 8760 + d * 24 + h;
+        let totalH = Math.floor(secs / 3600);
         let hh = String(totalH).padStart(2, '0');
         let mm = String(m).padStart(2, '0');
         let ss = String(s).padStart(2, '0');
