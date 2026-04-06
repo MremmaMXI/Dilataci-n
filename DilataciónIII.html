@@ -165,6 +165,67 @@
             color: #6b7280;
             margin-top: 5px;
         }
+
+        /* Barras de velocidad de reloj */
+        .clock-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            margin: 6px 0 4px 0;
+            overflow: hidden;
+        }
+        .clock-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.35s ease, background-color 0.35s ease;
+            max-width: 100%;
+        }
+
+        /* Badge masa extrema */
+        .mass-extreme-badge {
+            display: none;
+            background: var(--danger);
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.78em;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        /* Input de masa personalizada */
+        input.mass-custom-input {
+            width: 100%;
+            box-sizing: border-box;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(56,189,248,0.4);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.9em;
+            margin-top: 8px;
+            outline: none;
+        }
+        input.mass-custom-input:focus {
+            border-color: var(--accent-glow);
+        }
+
+        /* Etiqueta shift relativista */
+        .shift-label {
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+
+        /* Tasa de reloj */
+        .clock-rate-label {
+            font-size: 0.78em;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -173,13 +234,28 @@
 
     <div id="physicsPanel" class="hud-panel">
         <h2>Dinámica Gravitacional</h2>
+
+        <div class="slider-group">
+            <label>Zoom de Escena</label>
+            <input type="range" id="zoomCtrl" min="0.2" max="3.0" value="1.0" step="0.05">
+            <div class="metric-row" style="margin-top: 5px;">
+                <span>Escala Visual:</span>
+                <span id="txtZoom" class="metric-val">1.00×</span>
+            </div>
+        </div>
+
         <div class="slider-group">
             <label>Masa de Singularidad (Masas Solares M☉)</label>
             <input type="range" id="massCtrl" min="1" max="100" value="20" step="0.5">
             <div class="metric-row" style="margin-top: 5px;">
                 <span>Carga Másica:</span>
-                <span id="txtMass" class="metric-val">20.0 M☉</span>
+                <span>
+                    <span id="txtMass" class="metric-val">20.0 M☉</span>
+                    <span id="massExtremeBadge" class="mass-extreme-badge">⚠ MASA EXTREMA</span>
+                </span>
             </div>
+            <label for="massCustomInput" style="display:block;font-size:0.82em;color:#9ca3af;margin-top:6px;">Masa libre (M☉) — Enter para aplicar:</label>
+            <input type="number" id="massCustomInput" class="mass-custom-input" placeholder="Ej: 10000">
         </div>
         
         <div class="metric-row">
@@ -198,12 +274,18 @@
     <div id="clockShipUI" class="hud-panel">
         <h3>Tiempo Propio (Nave Local)</h3>
         <div id="dispLocalClock" class="digital-clock">00:00:00</div>
+        <div class="clock-bar-bg"><div id="barLocal" class="clock-bar-fill" style="width:100%;background:#38bdf8;"></div></div>
+        <div class="clock-rate-label">Tasa: <span id="rateLocal">1.00x</span></div>
+        <div id="shiftLabelLocal" class="shift-label" style="color:#38bdf8;"></div>
         <div class="hint">Flujo Experiencial: <span id="lblFlowLocal" style="color:#fff;font-weight:bold;">Tasa Natural (1.0x)</span></div>
     </div>
 
     <div id="clockInfinityUI" class="hud-panel">
         <h3>Tiempo Coordenado (Infinito Externo)</h3>
         <div id="dispExtClock" class="digital-clock">00:00:00</div>
+        <div class="clock-bar-bg"><div id="barExt" class="clock-bar-fill" style="width:100%;background:#38bdf8;"></div></div>
+        <div class="clock-rate-label" style="text-align:right;">Tasa: <span id="rateExt">1.00x</span></div>
+        <div id="shiftLabelExt" class="shift-label" style="color:#ef4444;text-align:right;"></div>
         <div class="hint">Flujo Observacional: <span id="lblFlowExt" style="color:#38bdf8;font-weight:bold;">Aceleración Extrema (Dilatado)</span></div>
     </div>
 
@@ -244,6 +326,12 @@
         // Constante Virtual: Cuántos píxeles en el Render equivale a un 1 Radio_rs (Se ajusta a la gráfica)
         const baseRsRenderPixels = 75; 
 
+        // Zoom de escena: multiplica baseRsRenderPixels solo en el renderizado visual
+        let zoomScale = 1.0;
+
+        // Masa personalizada libre (null = usar slider)
+        let customMassOverride = null;
+
         // Acumuladores Discretos Temporales (Bóveda de cronometría almacenada en Segundos Escalados abstractos)
         const simGlobalOverdrive = 7200; // Multiplicador ficticio base (p.e. 1 seg real = 2 horas simuladas para dinamismo acelerado visual del usuario)
         let timeBankLocal = 0; 
@@ -272,9 +360,16 @@
          * RUTINA SUBYACENTE FÍSICA: Integrador y Calculadora Vectorial General
          */
         function solvePhysicsState() {
-            // Extracción paramétrica del control deslizable
-            let massSolarRatioInput = parseFloat(document.getElementById('massCtrl').value);
+            // Extracción paramétrica del control deslizable (o masa personalizada libre)
+            let massSolarRatioInput;
+            if (customMassOverride !== null) {
+                massSolarRatioInput = customMassOverride;
+            } else {
+                massSolarRatioInput = parseFloat(document.getElementById('massCtrl').value);
+            }
             massBlackHoleKg = massSolarRatioInput * M_SOL;
+            
+            // Mostrar badge si la masa supera 1000 M☉ (actualizado más abajo junto al texto)
             
             // Métrica fundamental y postulado del horizonte ciego analítico
             // Fórmula: r_s = 2 * G * M / c^2
@@ -309,7 +404,8 @@
             let scalarGForce = forceAccelProper / 9.80665;
 
             // Inyección Telemétrica de la Capa de Presentación al DOM del explorador web interactivo
-            document.getElementById('txtMass').innerText = massSolarRatioInput.toFixed(1) + " M☉";
+            document.getElementById('txtMass').innerText = massSolarRatioInput.toLocaleString('es-ES', {maximumFractionDigits: 1}) + " M☉";
+            document.getElementById('massExtremeBadge').style.display = massSolarRatioInput > 1000 ? 'inline-block' : 'none';
             document.getElementById('txtRs').innerText = radioSchwarzschild_kilometros.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " km";
             
             // Corrección de sintaxis de magnitudes excesivas o valores de desbordamiento exponencial del procesador
@@ -369,6 +465,42 @@
             timeBankInfinity = 0;
         });
 
+        // Slider de zoom
+        document.getElementById('zoomCtrl').addEventListener('input', () => {
+            zoomScale = parseFloat(document.getElementById('zoomCtrl').value);
+            document.getElementById('txtZoom').innerText = zoomScale.toFixed(2) + '×';
+        });
+
+        // Scroll de rueda sobre el canvas para ajustar zoom
+        renderCanvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            let delta = e.deltaY > 0 ? -0.05 : 0.05;
+            zoomScale = Math.min(3.0, Math.max(0.2, zoomScale + delta));
+            zoomScale = Math.round(zoomScale * 100) / 100;
+            document.getElementById('zoomCtrl').value = zoomScale;
+            document.getElementById('txtZoom').innerText = zoomScale.toFixed(2) + '×';
+        }, { passive: false });
+
+        // Input numérico de masa personalizada
+        function applyCustomMass() {
+            let val = parseFloat(document.getElementById('massCustomInput').value);
+            if (!isNaN(val) && val > 0 && val <= 1e9) {
+                customMassOverride = val;
+                // Sincronizar slider si el valor cabe en su rango
+                if (val >= 1 && val <= 100) {
+                    document.getElementById('massCtrl').value = val;
+                }
+            }
+        }
+        document.getElementById('massCustomInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') applyCustomMass();
+        });
+        // Limpiar override si el usuario vuelve a usar el slider
+        document.getElementById('massCtrl').addEventListener('input', () => {
+            customMassOverride = null;
+            document.getElementById('massCustomInput').value = '';
+        });
+
         // Evento Inversor de Conciencia Perceptual Paradigmática y Fluctuación de Variables
         document.getElementById('btnToggleMode').addEventListener('click', () => {
             let nodePerspectiveUI = document.getElementById('badgePerspective');
@@ -401,70 +533,71 @@
          * PROCESADOR DE DIBUJADO DE RED RENDERIZADA: ÓPTICA GEOMÉTRICA DE ACRECIÓN Y SOMBRA Y BEAMING DOOPLER RELATIVISTA EXTREMO
          */
         function renderPhysicsScene(distanceShipOffset) {
+            let effectiveRsPixels = baseRsRenderPixels * zoomScale;
+
             drawCtx.fillStyle = '#0c0f12';
             drawCtx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
 
-            let renderDiskLimits = baseRsRenderPixels * 5.0; 
+            // Overlay de Redshift / Blueshift según perspectiva activa
+            if (currentPerspective === 'infinity_frame') {
+                drawCtx.fillStyle = 'rgba(239, 68, 68, 0.07)';
+            } else {
+                drawCtx.fillStyle = 'rgba(56, 189, 248, 0.07)';
+            }
+            drawCtx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
+
+            let renderDiskLimits = effectiveRsPixels * 5.0; 
             
             drawCtx.save();
             // Desplazamiento contextual hacia epicentro singular
             drawCtx.translate(centerPointX, centerPointY);
 
             // =========================================================================
-            // CAPA 1: CONSTRUCCIÓN ASTRONÓMICA ESTRUCTURAL: DISCO DE ACRECIÓN / "CRESCENT" (Medialuna luminosa de lente asimétrica)
-            // Implementación artificial del Beaming Doppler Relativista y Lente Magnificadora
+            // CAPA 1: CONSTRUCCIÓN ASTRONÓMICA ESTRUCTURAL: DISCO DE ACRECIÓN / "CRESCENT"
             // =========================================================================
             
-            // Falsificación sintética direccional usando elipse y desplazamientos gradientes hacia un hemisferio
-            // Creación radial del halo ardiente incandescente rotativo (Masa térmica y óptica asimétrica excéntrica)
-            let accretionGlow = drawCtx.createRadialGradient(-baseRsRenderPixels * 0.4, 0, baseRsRenderPixels * 0.5, 0, 0, renderDiskLimits);
+            let accretionGlow = drawCtx.createRadialGradient(-effectiveRsPixels * 0.4, 0, effectiveRsPixels * 0.5, 0, 0, renderDiskLimits);
             accretionGlow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-            accretionGlow.addColorStop(0.15, "rgba(234, 88, 12, 0.85)");  // Corrimiento espectral térmico (Naranja brillante)
-            accretionGlow.addColorStop(0.35, "rgba(220, 38, 38, 0.5)");   // Franja infrarroja visible o rubescente secundaria
+            accretionGlow.addColorStop(0.15, "rgba(234, 88, 12, 0.85)");
+            accretionGlow.addColorStop(0.35, "rgba(220, 38, 38, 0.5)");
             accretionGlow.addColorStop(0.7, "rgba(125, 20, 20, 0.15)"); 
             accretionGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
             
             drawCtx.beginPath();
-            // Renderizamos un óvalo masivo e intrincado como base primaria de acreción asimétrica de halo
             drawCtx.ellipse(0, 0, renderDiskLimits * 0.8, renderDiskLimits, 0, 0, Math.PI * 2);
             drawCtx.fillStyle = accretionGlow;
-            // Técnicas compuestas (screen) para simular emisión y adición termal fotónica natural lumínica de fluidos espaciales
             drawCtx.globalCompositeOperation = "screen";
             drawCtx.fill();
-            drawCtx.globalCompositeOperation = "source-over"; // Retorno base
+            drawCtx.globalCompositeOperation = "source-over";
 
             // =========================================================================
-            // CAPA 2: LENTE GRAVITACIONAL / ESFERA DE FOTONES Y SOMBRA APRENTE OBSERVABLE EN EL VACÍO CÓSMICO PROFUNDO
-            // Proporción matemática real: La sombra óptica aparente del Agujero de Schwarzschild mide ~2.6 rs 
+            // CAPA 2: LENTE GRAVITACIONAL / ESFERA DE FOTONES Y SOMBRA APARENTE
             // =========================================================================
-            let radiusPhotonicShadow = baseRsRenderPixels * 2.6;
+            let radiusPhotonicShadow = effectiveRsPixels * 2.6;
 
             drawCtx.beginPath();
-            // Desfase estratégico horizontal de las coordenadas para superponer la sombra y acentuar tajantemente y perfeccionar el corte del halo que crea el efecto visual nítido exacto dictado de la figura visual estricta de "MEDIALUNA" (Crescent Morph)
-            drawCtx.arc(-baseRsRenderPixels * 0.45, 0, radiusPhotonicShadow, 0, Math.PI * 2); 
-            drawCtx.fillStyle = "#0c0f12"; // Opacidad absoluta oscura neta
+            drawCtx.arc(-effectiveRsPixels * 0.45, 0, radiusPhotonicShadow, 0, Math.PI * 2); 
+            drawCtx.fillStyle = "#0c0f12";
             drawCtx.fill();
             
-            // Fino anillo espectral delimitador brillante correspondiente al umbral fronterizo de límite de fotones capturados estables
             drawCtx.beginPath();
-            drawCtx.arc(-baseRsRenderPixels * 0.45, 0, radiusPhotonicShadow, 0, Math.PI * 2);
+            drawCtx.arc(-effectiveRsPixels * 0.45, 0, radiusPhotonicShadow, 0, Math.PI * 2);
             drawCtx.lineWidth = 1.5;
             drawCtx.strokeStyle = "rgba(255, 220, 150, 0.35)";
             drawCtx.stroke();
 
-            // Singularidad núcleo puro (Centro gravitatorio matemático absoluto - no visible directamente, embutido internamente)
+            // Singularidad núcleo puro
             drawCtx.beginPath();
-            drawCtx.arc(0, 0, baseRsRenderPixels, 0, Math.PI * 2);
+            drawCtx.arc(0, 0, effectiveRsPixels, 0, Math.PI * 2);
             drawCtx.fillStyle = "#000";
             drawCtx.fill();
 
             drawCtx.restore();
 
             // =========================================================================
-            // CAPA 3: TOPOGRAFÍA DE REFERENCIA CARTESIANA, PARÁMETROS Y ENTIDAD GRÁFICA NAVAL OBSERVADORA
+            // CAPA 3: TOPOGRAFÍA DE REFERENCIA CARTESIANA Y ENTIDAD GRÁFICA NAVAL
             // =========================================================================
             
-            // Eje Direccional Lineal Auxiliar Reticular de la línea visual analítica ecuatorial
             drawCtx.beginPath();
             drawCtx.moveTo(centerPointX, centerPointY);
             drawCtx.lineTo(renderCanvas.width, centerPointY);
@@ -474,19 +607,18 @@
             drawCtx.stroke();
             drawCtx.setLineDash([]);
 
-            // Entidad interactiva y núcleo biológico / sensórico ("Nave o bolita estática artificial")
+            // Entidad interactiva — nave
+            let varColor = (currentPerspective === 'ship_frame') ? "#f59e0b" : "#38bdf8";
             drawCtx.beginPath();
             drawCtx.arc(posShipX, posShipY, 9, 0, Math.PI * 2);
-            drawCtx.fillStyle = varColor = (currentPerspective === 'ship_frame')? "#f59e0b" : "#38bdf8"; 
+            drawCtx.fillStyle = varColor;
             drawCtx.fill();
             
-            // Resplandor radiante cinético adosado para facilitar la usabilidad gráfica
             drawCtx.shadowBlur = 20;
             drawCtx.shadowColor = varColor;
             drawCtx.fill();
             drawCtx.shadowBlur = 0; 
 
-            // Capa de Metadatos Tipográficos In-Render texturizados
             drawCtx.fillStyle = "rgba(209, 213, 219, 0.8)";
             drawCtx.font = "13px 'Consolas', monospace";
             drawCtx.textAlign = "center";
@@ -494,7 +626,7 @@
             
             drawCtx.fillStyle = "rgba(255, 255, 255, 0.4)";
             drawCtx.font = "12px 'Consolas', monospace";
-            drawCtx.fillText("Epicentro Gravitacional", centerPointX, centerPointY + baseRsRenderPixels * 3.8);
+            drawCtx.fillText("Epicentro Gravitacional", centerPointX, centerPointY + effectiveRsPixels * 3.8);
             
             drawCtx.textAlign = "right";
             drawCtx.fillText("Progresión del Plano Coordenado Asintótico", renderCanvas.width - 25, centerPointY - 15);
@@ -536,6 +668,40 @@
             document.getElementById('dispLocalClock').innerText = stringLocalClock.digitalFormat;
             document.getElementById('dispExtClock').innerText = stringExtClock.digitalFormat;
             document.getElementById('dispDifference').innerText = stringDifferences.stringDelineated;
+
+            // Actualizar barras de velocidad de reloj y etiquetas de tasa
+            let extRate = (1 / metricRootDilation);
+            let localRate = metricRootDilation;
+
+            if (currentPerspective === 'ship_frame') {
+                // Nave va a tasa natural (1x), externo va más rápido
+                document.getElementById('barLocal').style.width = '100%';
+                document.getElementById('barLocal').style.backgroundColor = '#38bdf8';
+                document.getElementById('rateLocal').innerText = '1.00x';
+
+                let extBarPct = Math.min(extRate * 100, 100);
+                document.getElementById('barExt').style.width = extBarPct + '%';
+                document.getElementById('barExt').style.backgroundColor = extRate > 1.5 ? '#22c55e' : '#38bdf8';
+                document.getElementById('rateExt').innerText = extRate.toFixed(2) + 'x';
+
+                document.getElementById('shiftLabelLocal').innerText = '';
+                document.getElementById('shiftLabelExt').style.color = '#38bdf8';
+                document.getElementById('shiftLabelExt').innerText = '🔵 BLUESHIFT — Tiempo Comprimido';
+            } else {
+                // Externo va a tasa natural (1x), nave va lenta
+                document.getElementById('barExt').style.width = '100%';
+                document.getElementById('barExt').style.backgroundColor = '#38bdf8';
+                document.getElementById('rateExt').innerText = '1.00x';
+
+                let localBarPct = Math.min(localRate * 100, 100);
+                document.getElementById('barLocal').style.width = localBarPct + '%';
+                document.getElementById('barLocal').style.backgroundColor = localRate < 0.5 ? '#ef4444' : '#f59e0b';
+                document.getElementById('rateLocal').innerText = localRate.toFixed(2) + 'x';
+
+                document.getElementById('shiftLabelExt').innerText = '';
+                document.getElementById('shiftLabelLocal').style.color = '#ef4444';
+                document.getElementById('shiftLabelLocal').innerText = '🔴 REDSHIFT — Tiempo Dilatado';
+            }
 
             // Desencadenar la instrucción del renderizador de trazado pictórico vectorial gráfico general de cuadros
             renderPhysicsScene(metricsEval.deltaPixelDistance);
