@@ -274,9 +274,9 @@
             <span>Masa de la Singularidad (M☉)</span>
             <span id="txtMass" class="metric-val">20.0 M☉</span>
         </div>
-        <input type="range" id="massSlider" min="1" max="100" value="20" step="0.5">
+        <input type="range" id="massSlider" min="1" max="100" value="20" step="0.5" aria-label="Masa de la Singularidad en Masas Solares">
         <span id="badgeExtrema" class="extreme-badge">⚠ MASA EXTREMA</span>
-        <input type="number" id="massInput" placeholder="Masa libre (ej: 1000000) — Enter">
+        <input type="number" id="massInput" placeholder="Masa libre (ej: 1000000) — Enter" aria-label="Masa libre en masas solares, presiona Enter para aplicar">
     </div>
 
     <!-- Distancia -->
@@ -285,7 +285,7 @@
             <span>Distancia de la Nave (× rs)</span>
             <span id="txtDist" class="metric-val">4.00 × rs</span>
         </div>
-        <input type="range" id="distSlider" min="1.05" max="500" value="4" step="0.05">
+        <input type="range" id="distSlider" min="1.05" max="500" value="4" step="0.05" aria-label="Distancia de la Nave en múltiplos del radio de Schwarzschild">
         <div class="metric-row" style="margin-top:5px;">
             <span>Distancia en km:</span>
             <span id="txtDistKm" class="metric-val">—</span>
@@ -299,7 +299,7 @@
             <span>Zoom Visual (solo escala)</span>
             <span id="txtZoom" class="metric-val">1.00×</span>
         </div>
-        <input type="range" id="zoomSlider" min="0.1" max="3.0" value="1.0" step="0.05">
+        <input type="range" id="zoomSlider" min="0.1" max="3.0" value="1.0" step="0.05" aria-label="Zoom visual de la escena">
     </div>
 
     <hr class="sep">
